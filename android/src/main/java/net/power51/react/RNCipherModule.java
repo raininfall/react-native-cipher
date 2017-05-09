@@ -3,6 +3,7 @@ package net.power51.react;
 
 import android.os.AsyncTask;
 import android.provider.Settings;
+import android.util.Base64;
 import android.util.Log;
 
 import com.facebook.react.bridge.Promise;
@@ -19,10 +20,16 @@ import java.io.InputStream;
 import java.math.BigInteger;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
 
+import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
+import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -51,6 +58,17 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
         byte[] result = new byte[bytes.length - offset];
         System.arraycopy(result, 0, bytes, offset, bytes.length - offset);
         return result;
+    }
+
+    private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    private static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
     }
 
     private static class PromiseWrapper {
@@ -136,5 +154,32 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void decryptFile(String alg, String key, String keyAlg, String iv, String encryptFilePath, String decryptFilePath, Promise promise) {
         task.execute(alg, key, keyAlg, iv, encryptFilePath, decryptFilePath, promise);
+    }
+
+    @ReactMethod
+    public void rsaDecryptHex(String alg, String privateKeyBase64, String dataHex, Promise promise) {
+        try {
+            byte[] buffer = Base64.decode(privateKeyBase64, Base64.DEFAULT);
+            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(buffer);
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            RSAPrivateKey rsaPrivateKey = (RSAPrivateKey) keyFactory.generatePrivate(keySpec);
+            Cipher cipher = Cipher.getInstance("RSA");
+            // cipher= Cipher.getInstance("RSA", new BouncyCastleProvider());
+            cipher.init(Cipher.DECRYPT_MODE, rsaPrivateKey);
+            byte[] output = cipher.doFinal(hexToBytes(dataHex));
+            promise.resolve(bytesToHex(output));
+        } catch (NoSuchAlgorithmException exception) {
+            promise.reject(exception);
+        } catch (NoSuchPaddingException exception) {
+            promise.reject(exception);
+        } catch (InvalidKeySpecException exception) {
+            promise.reject(exception);
+        } catch (InvalidKeyException exception) {
+            promise.reject(exception);
+        } catch (IllegalBlockSizeException exception) {
+            promise.reject(exception);
+        } catch (BadPaddingException exception) {
+            promise.reject(exception);
+        }
     }
 }
