@@ -39,19 +39,19 @@ import static android.provider.Contacts.SettingsColumns.KEY;
 
 public class RNCipherModule extends ReactContextBaseJavaModule {
     private static final int BUFF_SIZE = 1024 * 64;
-    
+
     private final ReactApplicationContext reactContext;
-    
+
     public RNCipherModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
     }
-    
+
     @Override
     public String getName() {
         return "RNCipher";
     }
-    
+
     static private byte[] hexToBytes(String hex) {
         byte[] bytes = new BigInteger(hex, 16).toByteArray();
         final int offset = bytes.length - hex.length() / 2;
@@ -59,7 +59,7 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
         System.arraycopy(bytes, offset, result, 0, bytes.length - offset);
         return result;
     }
-    
+
     private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
     private static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
@@ -70,7 +70,7 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
         }
         return new String(hexChars);
     }
-    
+
     private static class PromiseWrapper {
         public PromiseWrapper(Promise promise, Throwable reason) {
             this.promise = promise;
@@ -89,19 +89,19 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
                 promise.resolve(size);
             }
         }
-        
-        
+
+
         private final Promise promise;
         private final Throwable reason;
         private final int size;
     }
-    
+
     static class DecryptTask extends AsyncTask<Object, Object, PromiseWrapper> {
         @Override
         protected void onPostExecute(PromiseWrapper result) {
             result.done();
         }
-        
+
         @Override
         protected PromiseWrapper doInBackground(Object[] objects) {
             final String alg =              (String)objects[0];
@@ -112,7 +112,7 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
             final String decryptFilePath =  (String)objects[5];
             final Promise promise =         (Promise)objects[6];
             int size = 0;
-            
+
             try {
                 Cipher cipher = Cipher.getInstance(alg);
                 byte[] key = hexToBytes(keyString);
@@ -124,14 +124,18 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
                 FileOutputStream fileOutputStream = new FileOutputStream(decryptFilePath);
                 byte[] temp = new byte[BUFF_SIZE];
                 int ret = 0;
-                
+
                 while ((ret = cipherInputStream.read(temp)) > 0) {
                     fileOutputStream.write(temp, 0, ret);
                     size += ret;
                 }
-                
+
+                fileOutputStream.close();
+                cipherInputStream.close();
+                inputStream.close();
+
                 return new PromiseWrapper(promise, size);
-                
+
             } catch (NoSuchAlgorithmException exception) {
                 Log.e("RNCipher", exception.toString());
                 return new PromiseWrapper(promise, exception);
@@ -153,13 +157,13 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
             }
         }
     };
-    
+
     @ReactMethod
     public void decryptFile(String alg, String key, String keyAlg, String iv, String encryptFilePath, String decryptFilePath, Promise promise) {
         DecryptTask task = new DecryptTask();
         task.execute(alg, key, keyAlg, iv, encryptFilePath, decryptFilePath, promise);
     }
-    
+
     @ReactMethod
     public void rsaDecryptHex(String alg, String privateKeyBase64, String dataHex, Promise promise) {
         try {
