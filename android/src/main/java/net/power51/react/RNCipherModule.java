@@ -128,11 +128,11 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
                 cipherInputStream = new CipherInputStream(inputStream, cipher);
                 fileOutputStream = new FileOutputStream(decryptFilePath);
                 byte[] temp = new byte[BUFF_SIZE];
-                int ret = 0;
+                int len = 0;
 
                 while ((ret = cipherInputStream.read(temp)) > 0) {
-                    fileOutputStream.write(temp, 0, ret);
-                    size += ret;
+                    fileOutputStream.write(temp, 0, len);
+                    size += len;
                 }
 
                 ret = new PromiseWrapper(promise, size);
