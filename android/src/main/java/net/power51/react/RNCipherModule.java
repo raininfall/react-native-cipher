@@ -194,7 +194,7 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
             PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(buffer);
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
             RSAPrivateKey rsaPrivateKey = (RSAPrivateKey) keyFactory.generatePrivate(keySpec);
-            Cipher cipher = Cipher.getInstance("RSA");
+            Cipher cipher = Cipher.getInstance(alg, "BC");
             // cipher= Cipher.getInstance("RSA", new BouncyCastleProvider());
             cipher.init(Cipher.DECRYPT_MODE, rsaPrivateKey);
             byte[] output = cipher.doFinal(hexToBytes(dataHex));
@@ -210,6 +210,8 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
         } catch (IllegalBlockSizeException exception) {
             promise.reject(exception);
         } catch (BadPaddingException exception) {
+            promise.reject(exception);
+        } catch (NoSuchProviderException exception) {
             promise.reject(exception);
         }
     }
