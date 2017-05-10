@@ -112,6 +112,11 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
             final String decryptFilePath =  (String)objects[5];
             final Promise promise =         (Promise)objects[6];
             int size = 0;
+            PromiseWrapper ret = null;
+
+            InputStream inputStream = null;
+            CipherInputStream cipherInputStream = null;
+            FileOutputStream fileOutputStream = null;
 
             try {
                 Cipher cipher = Cipher.getInstance(alg);
@@ -119,9 +124,9 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
                 byte[] iv = hexToBytes(ivString);
                 IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
                 cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, keyAlg), ivParameterSpec);
-                InputStream inputStream = new FileInputStream(encryptFilePath);
-                CipherInputStream cipherInputStream = new CipherInputStream(inputStream, cipher);
-                FileOutputStream fileOutputStream = new FileOutputStream(decryptFilePath);
+                inputStream = new FileInputStream(encryptFilePath);
+                cipherInputStream = new CipherInputStream(inputStream, cipher);
+                fileOutputStream = new FileOutputStream(decryptFilePath);
                 byte[] temp = new byte[BUFF_SIZE];
                 int ret = 0;
 
@@ -130,31 +135,37 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
                     size += ret;
                 }
 
-                fileOutputStream.close();
-                cipherInputStream.close();
-                inputStream.close();
-
-                return new PromiseWrapper(promise, size);
-
+                ret = new PromiseWrapper(promise, size);
             } catch (NoSuchAlgorithmException exception) {
                 Log.e("RNCipher", exception.toString());
-                return new PromiseWrapper(promise, exception);
+                ret =  new PromiseWrapper(promise, exception);
             } catch (NoSuchPaddingException exception) {
                 Log.e("RNCipher", exception.toString());
-                return new PromiseWrapper(promise, exception);
+                ret = new PromiseWrapper(promise, exception);
             } catch (InvalidKeyException exception) {
                 Log.e("RNCipher", exception.toString());
-                return new PromiseWrapper(promise, exception);
+                ret = new PromiseWrapper(promise, exception);
             } catch (InvalidAlgorithmParameterException exception) {
                 Log.e("RNCipher", exception.toString());
-                return new PromiseWrapper(promise, exception);
+                ret = new PromiseWrapper(promise, exception);
             } catch (FileNotFoundException exception) {
                 Log.e("RNCipher", exception.toString());
-                return new PromiseWrapper(promise, exception);
+                ret = new PromiseWrapper(promise, exception);
             } catch (IOException exception) {
                 Log.e("RNCipher", exception.toString());
-                return new PromiseWrapper(promise, exception);
+                ret = new PromiseWrapper(promise, exception);
+            } finally {
+              if (fileOutputStream != null) {
+                fileOutputStream.close();
+              }
+              if (cipherInputStream != null) {
+                cipherInputStream.close();
+              }
+              if (inputStream != null) {
+                inputStream.close();
+              }
             }
+            return ret;
         }
     };
 
