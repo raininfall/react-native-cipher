@@ -155,14 +155,26 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
                 Log.e("RNCipher", exception.toString());
                 ret = new PromiseWrapper(promise, exception);
             } finally {
-              if (fileOutputStream != null) {
-                fileOutputStream.close();
+              try {
+                if (fileOutputStream != null) {
+                  fileOutputStream.close();
+                }
+              } catch (IOException exception) {
+
               }
-              if (cipherInputStream != null) {
-                cipherInputStream.close();
+              try {
+                if (cipherInputStream != null) {
+                  cipherInputStream.close();
+                }
+              } catch (IOException exception) {
+
               }
-              if (inputStream != null) {
-                inputStream.close();
+              try{
+                if (inputStream != null) {
+                  inputStream.close();
+                }
+              } catch (IOException exception) {
+
               }
             }
             return ret;
