@@ -22,6 +22,7 @@ import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -38,28 +39,27 @@ import static android.provider.Contacts.SettingsColumns.KEY;
 
 public class RNCipherModule extends ReactContextBaseJavaModule {
     private static final int BUFF_SIZE = 1024 * 64;
-
+    
     private final ReactApplicationContext reactContext;
-
+    
     public RNCipherModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
     }
-
+    
     @Override
     public String getName() {
         return "RNCipher";
     }
-
+    
     static private byte[] hexToBytes(String hex) {
         byte[] bytes = new BigInteger(hex, 16).toByteArray();
-        int offset = 0;
-        for(; offset < bytes.length && bytes[offset] == 0; ++offset);
+        final int offset = bytes.length - hex.length() / 2;
         byte[] result = new byte[bytes.length - offset];
-        System.arraycopy(result, 0, bytes, offset, bytes.length - offset);
+        System.arraycopy(bytes, offset, result, 0, bytes.length - offset);
         return result;
     }
-
+    
     private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
     private static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
@@ -70,7 +70,7 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
         }
         return new String(hexChars);
     }
-
+    
     private static class PromiseWrapper {
         public PromiseWrapper(Promise promise, Throwable reason) {
             this.promise = promise;
@@ -89,46 +89,49 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
                 promise.resolve(size);
             }
         }
-
-
+        
+        
         private final Promise promise;
         private final Throwable reason;
         private final int size;
     }
-
-    private final AsyncTask task = new AsyncTask<Object, Object, PromiseWrapper>() {
+    
+    static class DecryptTask extends AsyncTask<Object, Object, PromiseWrapper> {
         @Override
         protected void onPostExecute(PromiseWrapper result) {
             result.done();
         }
-
+        
         @Override
         protected PromiseWrapper doInBackground(Object[] objects) {
             final String alg =              (String)objects[0];
-            final String key =              (String)objects[1];
+            final String keyString =              (String)objects[1];
             final String keyAlg =           (String)objects[2];
-            final String iv =               (String)objects[3];
+            final String ivString =               (String)objects[3];
             final String encryptFilePath =  (String)objects[4];
             final String decryptFilePath =  (String)objects[5];
             final Promise promise =         (Promise)objects[6];
             int size = 0;
-
+            
             try {
                 Cipher cipher = Cipher.getInstance(alg);
-                cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(hexToBytes(key), keyAlg), new IvParameterSpec(hexToBytes(iv)));
+                byte[] key = hexToBytes(keyString);
+                byte[] iv = hexToBytes(ivString);
+                IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
+                cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, keyAlg), ivParameterSpec);
                 InputStream inputStream = new FileInputStream(encryptFilePath);
                 CipherInputStream cipherInputStream = new CipherInputStream(inputStream, cipher);
                 FileOutputStream fileOutputStream = new FileOutputStream(decryptFilePath);
                 byte[] temp = new byte[BUFF_SIZE];
                 int ret = 0;
-
+                
                 while ((ret = cipherInputStream.read(temp)) > 0) {
                     fileOutputStream.write(temp, 0, ret);
                     size += ret;
                 }
-
+                
                 return new PromiseWrapper(promise, size);
-
+                
             } catch (NoSuchAlgorithmException exception) {
                 Log.e("RNCipher", exception.toString());
                 return new PromiseWrapper(promise, exception);
@@ -150,12 +153,13 @@ public class RNCipherModule extends ReactContextBaseJavaModule {
             }
         }
     };
-
+    
     @ReactMethod
     public void decryptFile(String alg, String key, String keyAlg, String iv, String encryptFilePath, String decryptFilePath, Promise promise) {
+        DecryptTask task = new DecryptTask();
         task.execute(alg, key, keyAlg, iv, encryptFilePath, decryptFilePath, promise);
     }
-
+    
     @ReactMethod
     public void rsaDecryptHex(String alg, String privateKeyBase64, String dataHex, Promise promise) {
         try {
